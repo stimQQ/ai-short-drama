@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="studio-token" content="__STUDIO_TOKEN__">
+  <title>AI Short Drama Studio</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="topBar">
+    <div class="brand"><span class="logo">🎬</span><span id="brandName">AI Short Drama Studio</span></div>
+    <div class="topRight">
+      <div id="account" class="account"></div>
+      <button id="langToggle" class="ghost small" type="button"></button>
+    </div>
+  </header>
+  <div class="layout">
+    <aside class="sidebar">
+      <button id="newProject" class="primary wide" type="button"></button>
+      <div id="projectList" class="projectList"></div>
+      <p id="folderNote" class="muted tiny"></p>
+    </aside>
+    <main id="main" class="main"></main>
+  </div>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

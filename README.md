@@ -4,11 +4,12 @@
 
 <a id="english"></a>
 
-**ai-short-drama is an open-source Agent Skill that turns a story into a
-finished short-drama episode.** The same characters appear in every shot, they
-speak their lines or a narrator tells the story, and you get subtitles and one
-MP4 at the end. It runs inside Claude Code, Cursor, Codex, Gemini CLI and other
-agents that read skills. Generation goes through [apimodels.app](https://apimodels.app):
+**ai-short-drama turns a story into a finished short-drama episode.** The same
+characters appear in every shot, they speak their lines or a narrator tells the
+story, and you get subtitles and one MP4 at the end. Use it two ways: as an
+**Agent Skill** inside Claude Code, Cursor, Codex, Gemini CLI and other agents
+that read skills, or as the **Studio**, a four-step app that runs on your own
+computer, with no agent needed. Generation goes through [apimodels.app](https://apimodels.app):
 one API key covers Seedance 2.0 for video, Nano Banana for character sheets and
 MiniMax for the voice-over.
 
@@ -52,6 +53,40 @@ burned in:
 
 ![Character sheet: portrait plus front, side and back views](assets/sample-character-sheet.jpg)
 ![Five frames from the finished shot with burned-in subtitles](assets/sample-shot-frames.jpg)
+
+## Studio: four steps, no agent needed
+
+The Studio is a local web app: paste a story, check the characters, render the
+shots, download the episode. It needs only Node.js 18+ and ffmpeg.
+
+```bash
+npx github:stimQQ/ai-short-drama
+```
+
+That opens `http://127.0.0.1:4317` in your browser. Projects are saved in
+`~/AI-Short-Drama` (change it with `--dir`). The steps:
+
+1. **Story.** Paste a story or a novel chapter, then pick a look, the frame
+   (9:16 or 16:9), narration or dialogue, and a length. **Write the shots with
+   AI** turns it into characters, places and a shot list. That costs about
+   $0.01 and takes about 30 s.
+2. **Cast.** One reference sheet per character and one image per place. Edit a
+   description and redraw anything you do not like before rendering video.
+3. **Shots.** Edit any shot, render one to check it, then render the rest.
+   Every button shows its price first.
+4. **Episode.** Cut, mix the narration and burn in subtitles, locally and free.
+   Download the MP4 with or without subtitles, plus the `.srt`.
+
+![Studio, step 2: a character sheet ready to use](assets/studio-cast.jpg)
+![Studio, step 3: a rendered shot with its prompt and narration](assets/studio-shots.jpg)
+
+The Studio drives the same engine as the skill, so it has the same guarantees:
+- An interrupted render resumes instead of being paid for again.
+- Failed tasks are not charged.
+- The spend shown is the amount actually billed.
+
+It listens on 127.0.0.1 only. Every request must carry a per-run token, so
+other web pages cannot reach it.
 
 ## How it works
 
@@ -202,7 +237,9 @@ write shots that cut together.
 ## Development
 
 ```bash
-pnpm test        # offline: no key, no network, no spend (ffmpeg needed for the assemble test)
+pnpm test        # offline: no key, no network, no spend (ffmpeg needed for the assemble and studio tests)
+pnpm studio      # run the Studio from a clone
+node test/fakeApi.mjs   # a stand-in API to click through the Studio without spending anything
 ```
 
 MIT licensed.
@@ -213,14 +250,28 @@ MIT licensed.
 
 ## 中文
 
-**ai-short-drama 是一个开源 Agent Skill，把一段故事变成一集完整的短剧 / AI 漫剧。**
+**ai-short-drama 把一段故事变成一集完整的短剧 / AI 漫剧。** 有两种用法：作为 **Agent Skill** 在 Claude Code、Cursor、Codex 等 Agent 里用；或者打开**工作台**，在自己电脑上按四步操作，不需要 Agent。
 每个镜头里的角色保持同一张脸、同一套衣服；可以让角色开口说台词，也可以用旁白讲故事。最后输出一个 MP4 和一份字幕。
 它在 Claude Code、Cursor、Codex、Gemini CLI 等支持 skill 的 Agent 里运行，生成走 [apimodels.app](https://apimodels.app)：
 一个 API Key 同时用 Seedance 2.0 出视频、Nano Banana 出角色设定图、MiniMax 配旁白。
 
 *说明：本 skill 由 apimodels.app 团队开发维护，运行时使用 apimodels.app 的 API Key，按次计费。*
 
-**流程：**
+**工作台（四步，不需要 Agent）：** 需要 Node.js 18+ 和 ffmpeg，运行：
+
+```bash
+npx github:stimQQ/ai-short-drama
+```
+
+浏览器会打开 `http://127.0.0.1:4317`，项目保存在 `~/AI-Short-Drama`。四步如下：
+1. **故事**：粘贴故事或小说章节，选画风、画幅（竖屏或横屏）、旁白或对白、时长，再点 **AI 拆分镜**，自动拆出角色、场景和分镜。约 $0.01，30 秒左右。
+2. **角色与场景**：每个角色一张设定图，每个场景一张图。不满意就改描述、点重画，确认后再生成视频。
+3. **分镜**：每个镜头都能改，可以先生成一个看看效果，再生成全部。每个按钮都先标价。
+4. **成片**：在本机拼接、混旁白、压字幕，免费。可下载带字幕版、无字幕版和 `.srt`。
+
+工作台和 skill 用同一个引擎：中断后接着做、不重复扣费，失败不扣费，显示的花费就是实际扣费。工作台只监听本机，并且每个请求都要带启动时生成的令牌，其他网页无法调用它。
+
+**skill 的流程：**
 1. Agent 根据你的想法写 `project.json`（角色、场景、分镜、台词或旁白）。
 2. `cast` 给每个角色生成一张设定图（大头像加正、侧、背三视图），给每个场景生成一张场景图。先给你看，满意了再往下走。
 3. `voice`（旁白模式）合成旁白，镜头时长自动跟着旁白长度走。

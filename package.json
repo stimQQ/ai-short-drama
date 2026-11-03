@@ -2,12 +2,27 @@
   "name": "ai-short-drama",
   "version": "0.1.0",
   "private": true,
-  "description": "Agent Skill: story to finished short drama episode with consistent characters, on apimodels.app",
+  "description": "Story to finished short drama episode with consistent characters, on apimodels.app — an Agent Skill plus a local four-step studio",
   "type": "module",
   "license": "MIT",
-  "engines": { "node": ">=18" },
+  "engines": {
+    "node": ">=18"
+  },
   "packageManager": "pnpm@10.34.5",
   "scripts": {
-    "test": "node --test test/drama.test.mjs"
-  }
+    "studio": "node studio/server.mjs",
+    "test": "node --test test/drama.test.mjs test/studio.test.mjs"
+  },
+  "bin": {
+    "ai-short-drama": "studio/server.mjs"
+  },
+  "files": [
+    "SKILL.md",
+    "scripts",
+    "studio",
+    "references",
+    "examples",
+    "README.md",
+    "LICENSE"
+  ]
 }

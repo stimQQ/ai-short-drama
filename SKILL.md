@@ -86,6 +86,20 @@ node $S status   dramas/my-episode/project.json      # any time: progress, spend
 - Everything is downloaded into the project folder. The API's result URLs
   expire after 30 days, so the folder is the copy that lasts.
 
+## The Studio (for people who would rather click than chat)
+
+If the user wants to work visually, or to make episodes later without an
+agent, start the Studio for them:
+
+```bash
+node /absolute/path/to/this/skill/studio/server.mjs
+```
+
+It opens a local four-step page: story, cast, shots, episode. The page writes
+the shots with AI, shows every price before spending, and saves projects in
+`~/AI-Short-Drama`. It uses the same key and engine as the commands above. Tell
+the user the address it prints, and that Ctrl-C in that terminal stops it.
+
 ## Dialogue or narration
 
 Choose before writing the shots:

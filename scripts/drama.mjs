@@ -29,7 +29,7 @@ import { execFile } from 'node:child_process'
 import { pathToFileURL } from 'node:url'
 
 // Same variable as the apimodels MCP server; also what the offline tests point at a fake API.
-const API = (process.env.APIMODELS_BASE_URL || 'https://api.apimodels.app/v1').replace(/\/$/, '')
+export const API = (process.env.APIMODELS_BASE_URL || 'https://api.apimodels.app/v1').replace(/\/$/, '')
 const CONSOLE_URL = 'https://apimodels.app/console/api-keys'
 const CRED_DIR = join(homedir(), '.apimodels')
 const CRED_FILE = join(CRED_DIR, 'credentials')
@@ -259,7 +259,7 @@ export function sheetPrompt(p, item, kind) {
   ].filter(Boolean).join(' ')
 }
 
-const shotHash = (p, s) => createHash('sha1')
+export const shotHash = (p, s) => createHash('sha1')
   .update(JSON.stringify([p.video_model, p.resolution, p.aspect, shotDuration(p, s), buildShotPrompt(p, s), shotRefUrls(p, s)]))
   .digest('hex').slice(0, 12)
 const textHash = (t) => createHash('sha1').update(String(t)).digest('hex').slice(0, 12)
@@ -294,7 +294,7 @@ export function estimate(p) {
 
 /** Sum of what the API actually billed so far, as recorded in the project. */
 export function spent(p) {
-  let n = 0
+  let n = p.storyboard?.cost || 0
   for (const { item } of castEntries(p)) n += item.sheet_cost || 0
   for (const s of p.shots) n += (s.cost || 0) + (s.voice?.cost || 0)
   return n
@@ -359,7 +359,7 @@ function fail(message, hint, extra) {
  * There is deliberately no --key flag: arguments end up in transcripts and
  * process listings.
  */
-async function resolveKey() {
+export async function resolveKey() {
   const fromEnv = process.env.APIMODELS_API_KEY?.trim()
   if (fromEnv) return fromEnv
   try {
@@ -393,7 +393,7 @@ async function saveKey() {
   return 0
 }
 
-async function storeKey(key) {
+export async function storeKey(key) {
   await mkdir(CRED_DIR, { recursive: true })
   await writeFile(CRED_FILE, key + '\n', { mode: 0o600 })
   await chmod(CRED_FILE, 0o600).catch(() => {})
@@ -459,7 +459,7 @@ async function login() {
  * so the body decides, not the status line. `transient` marks failures worth
  * retrying while polling (network blips, gateway errors).
  */
-async function call(url, init, key) {
+export async function call(url, init, key) {
   let res
   try {
     res = await fetch(url, {
@@ -571,7 +571,7 @@ const extOf = (url, fallback) => {
 
 // ─── Project file ────────────────────────────────────────────────────────────
 
-async function loadProject(file) {
+export async function loadProject(file) {
   const path = resolve(file)
   let raw
   try { raw = JSON.parse(await readFile(path, 'utf8')) } catch (e) {
@@ -599,61 +599,64 @@ async function pool(items, n, fn) {
 
 const usd = (n) => (n == null ? '  ?   ' : `$${n.toFixed(n < 10 ? 3 : 2)}`)
 
-function printEstimate(est) {
-  for (const r of est.rows) console.log(`  ${r.stage.padEnd(6)} ${usd(r.cost).padStart(8)}  ${r.what}`)
-  console.log(`  total  ${usd(est.total).padStart(8)}${est.complete ? '' : '  (+ items with unknown price)'}`)
+function printEstimate(est, out) {
+  for (const r of est.rows) out.log(`  ${r.stage.padEnd(6)} ${usd(r.cost).padStart(8)}  ${r.what}`)
+  out.log(`  total  ${usd(est.total).padStart(8)}${est.complete ? '' : '  (+ items with unknown price)'}`)
 }
 
 /** Stop before spending more than CONFIRM_ABOVE_USD unless --yes was given. */
-function gate(cost, opts, what) {
+function gate(cost, opts, what, out) {
   if (cost <= CONFIRM_ABOVE_USD || opts.yes) return true
-  console.log(`\n${what} will cost about ${usd(cost)}. Confirm with the user, then re-run with --yes.`)
+  out.log(`\n${what} will cost about ${usd(cost)}. Confirm with the user, then re-run with --yes.`)
   return false
 }
 
-function checkOrExit(p) {
+/** An error the CLI turns into a specific exit code instead of a crash. */
+const stop = (message, exitCode = 2) => Object.assign(new Error(message), { exitCode })
+
+function checkOrExit(p, out) {
   const { errors, warnings } = validate(p)
-  for (const w of warnings) console.log(`  ! ${w}`)
+  for (const w of warnings) out.log(`  ! ${w}`)
   if (errors.length) {
-    for (const e of errors) console.error(`  ✗ ${e}`)
-    console.error(`\n${errors.length} problem(s) in project.json — fix them and run again.`)
-    process.exit(2)
+    for (const e of errors) out.error(`  ✗ ${e}`)
+    throw stop(`${errors.length} problem(s) in project.json — fix them and run again.`)
   }
 }
 
 // ─── Commands ────────────────────────────────────────────────────────────────
 
-async function cmdCast(proj, key, opts) {
+export async function cmdCast(proj, key, opts) {
+  const out = opts.out ?? console
   const p = proj.data
-  checkOrExit(p)
+  checkOrExit(p, out)
   const todo = castEntries(p).filter(({ item }) => opts.redo.has(item.id) || !item.sheet_url)
-  if (!todo.length) { console.log('✓ every character and location already has a reference image'); return 0 }
+  if (!todo.length) { out.log('✓ every character and location already has a reference image'); return 0 }
   // Entries with a sheet_file are the user's own image: (re-)uploaded, never generated.
   const generate = todo.filter(({ item }) => !item.sheet_file)
   const ip = IMAGE_PRICES[p.image_model]?.[p.image_resolution]
   const cost = generate.filter(({ item }) => opts.redo.has(item.id) || !item.sheet_task_id).length * (ip ?? 0)
-  if (!gate(cost, opts, `Generating ${generate.length} reference image(s)`)) return 3
+  if (!gate(cost, opts, `Generating ${generate.length} reference image(s)`, out)) return 3
 
   let failed = 0
   await pool(todo, opts.concurrency, async ({ kind, item }) => {
     const local = join(proj.dir, 'cast', `${item.id}`)
     if (item.sheet_file) {
-      console.log(`▸ ${item.id}: uploading ${item.sheet_file}`)
+      out.log(`▸ ${item.id}: uploading ${item.sheet_file}`)
       const r = await upload(resolve(proj.dir, item.sheet_file), key)
-      if (!r.ok) { failed++; console.error(`✗ ${item.id}: ${r.message}`); return }
+      if (!r.ok) { failed++; out.error(`✗ ${item.id}: ${r.message}`); return }
       item.sheet_url = r.url
       await proj.save()
-      console.log(`✓ ${item.id}: uploaded`)
+      out.log(`✓ ${item.id}: uploaded`)
       return
     }
     if (opts.redo.has(item.id)) delete item.sheet_task_id
     const onTaskId = async (id) => { item.sheet_task_id = id; await proj.save() }
     let r
     if (item.sheet_task_id) {
-      console.log(`▸ ${item.id}: resuming task ${item.sheet_task_id}`)
+      out.log(`▸ ${item.id}: resuming task ${item.sheet_task_id}`)
       r = await waitTask('images', item.sheet_task_id, key)
     } else {
-      console.log(`▸ ${item.id}: generating ${kind} reference (${p.image_model} ${p.image_resolution})`)
+      out.log(`▸ ${item.id}: generating ${kind} reference (${p.image_model} ${p.image_resolution})`)
       const aspect = kind === 'character' ? '16:9' : (p.aspect === 'adaptive' ? '16:9' : p.aspect)
       r = await runTask('images', { model: p.image_model, prompt: sheetPrompt(p, item, kind), resolution: p.image_resolution, aspect_ratio: aspect }, key, onTaskId)
     }
@@ -661,32 +664,33 @@ async function cmdCast(proj, key, opts) {
       failed++
       if (!r.pending) delete item.sheet_task_id
       await proj.save()
-      console.error(`✗ ${item.id}: ${r.message}\n  ${r.hint || explain(r.message, p)}`)
+      out.error(`✗ ${item.id}: ${r.message}\n  ${r.hint || explain(r.message, p)}`)
       return
     }
     const file = `${local}${extOf(r.urls[0], '.png')}`
     try { await download(r.urls[0], file); item.sheet_path = file.slice(proj.dir.length + 1) } catch (e) {
-      console.error(`  (${item.id}: could not save locally: ${e.message} — the URL still works for 30 days)`)
+      out.error(`  (${item.id}: could not save locally: ${e.message} — the URL still works for 30 days)`)
     }
     item.sheet_url = r.urls[0]
     item.sheet_cost = await billed(r.taskId, key)
     await proj.save()
-    console.log(`✓ ${item.id}: ${item.sheet_path || item.sheet_url}  (${usd(item.sheet_cost)})`)
+    out.log(`✓ ${item.id}: ${item.sheet_path || item.sheet_url}  (${usd(item.sheet_cost)})`)
   })
-  console.log(failed ? `\n${failed} failed — fix and run cast again; finished ones are kept.` : '\n✓ cast ready. Look at the images in cast/ before rendering shots — redo any with: cast --redo <id>')
+  out.log(failed ? `\n${failed} failed — fix and run cast again; finished ones are kept.` : '\n✓ cast ready. Look at the images in cast/ before rendering shots — redo any with: cast --redo <id>')
   return failed ? 1 : 0
 }
 
-async function cmdVoice(proj, key, opts) {
+export async function cmdVoice(proj, key, opts) {
+  const out = opts.out ?? console
   const p = proj.data
-  if (p.mode !== 'narration') { console.log('This project is in dialogue mode — Seedance voices the lines itself, nothing to do here.'); return 0 }
-  checkOrExit(p)
+  if (p.mode !== 'narration') { out.log('This project is in dialogue mode — Seedance voices the lines itself, nothing to do here.'); return 0 }
+  checkOrExit(p, out)
   await needBin('ffprobe')
   const todo = p.shots.filter((s) => s.narration && (opts.redo.has(s.id) || !(s.voice?.file && s.voice?.text_hash === textHash(s.narration))))
-  if (!todo.length) { console.log('✓ narration is up to date'); return 0 }
+  if (!todo.length) { out.log('✓ narration is up to date'); return 0 }
   const rate = TTS_PRICES[p.narrator.model] ?? 0
   const cost = todo.reduce((n, s) => n + (ttsChars(s.narration) / 1000) * rate, 0)
-  if (!gate(cost, opts, `Voicing ${todo.length} narration clip(s)`)) return 3
+  if (!gate(cost, opts, `Voicing ${todo.length} narration clip(s)`, out)) return 3
 
   let failed = 0
   await pool(todo, opts.concurrency, async (s) => {
@@ -704,7 +708,7 @@ async function cmdVoice(proj, key, opts) {
       failed++
       if (!r.pending) delete v.task_id
       await proj.save()
-      console.error(`✗ ${s.id} narration: ${r.message}\n  ${r.hint || explain(r.message, p)}`)
+      out.error(`✗ ${s.id} narration: ${r.message}\n  ${r.hint || explain(r.message, p)}`)
       return
     }
     const file = join(proj.dir, 'audio', `${s.id}${extOf(r.urls[0], '.mp3')}`)
@@ -715,19 +719,20 @@ async function cmdVoice(proj, key, opts) {
     v.cost = await billed(r.taskId, key)
     await proj.save()
     const stale = s.state === 'done' && s.hash !== shotHash(p, s) ? '  — the shot was rendered for a different length; re-render it with shots --redo ' + s.id : ''
-    console.log(`✓ ${s.id}: ${v.seconds} s of narration → shot will be ${shotDuration(p, s)} s  (${usd(v.cost)})${stale}`)
+    out.log(`✓ ${s.id}: ${v.seconds} s of narration → shot will be ${shotDuration(p, s)} s  (${usd(v.cost)})${stale}`)
   })
   return failed ? 1 : 0
 }
 
-async function cmdShots(proj, key, opts) {
+export async function cmdShots(proj, key, opts) {
+  const out = opts.out ?? console
   const p = proj.data
-  checkOrExit(p)
+  checkOrExit(p, out)
   const missing = castEntries(p).filter(({ item }) => !item.sheet_url).map(({ item }) => item.id)
-  if (missing.length) { console.error(`✗ no reference image yet for: ${missing.join(', ')} — run cast first.`); return 2 }
+  if (missing.length) { out.error(`✗ no reference image yet for: ${missing.join(', ')} — run cast first.`); return 2 }
   if (p.mode === 'narration') {
     const unvoiced = p.shots.filter((s) => s.narration && !(s.voice?.seconds && s.voice.text_hash === textHash(s.narration))).map((s) => s.id)
-    if (unvoiced.length) { console.error(`✗ narration not voiced yet for: ${unvoiced.join(', ')} — run voice first (shot length follows the narration, and edited narration needs a new voice-over).`); return 2 }
+    if (unvoiced.length) { out.error(`✗ narration not voiced yet for: ${unvoiced.join(', ')} — run voice first (shot length follows the narration, and edited narration needs a new voice-over).`); return 2 }
   }
 
   const picked = opts.only.size ? p.shots.filter((s) => opts.only.has(s.id)) : p.shots
@@ -739,23 +744,23 @@ async function cmdShots(proj, key, opts) {
   })
   if (!todo.length) {
     const failed = picked.filter((s) => s.state === 'failed').map((s) => s.id)
-    console.log(failed.length ? `Nothing to run. Failed shots (${failed.join(', ')}) are retried only with --retry-failed.` : '✓ every shot is rendered — next: assemble')
+    out.log(failed.length ? `Nothing to run. Failed shots (${failed.join(', ')}) are retried only with --retry-failed.` : '✓ every shot is rendered — next: assemble')
     return 0
   }
   const vp = VIDEO_PRICES[p.video_model]?.[p.resolution] ?? 0
   const fresh = todo.filter((s) => opts.redo.has(s.id) || !(s.state === 'submitted' && s.task_id))
   const cost = fresh.reduce((n, s) => n + shotDuration(p, s) * vp, 0)
-  console.log(`▸ ${todo.length} shot(s) on ${p.video_model} ${p.resolution}${fresh.length < todo.length ? ` (${todo.length - fresh.length} resumed, already paid)` : ''} — about ${usd(cost)}`)
-  if (!gate(cost, opts, `Rendering ${fresh.length} shot(s)`)) return 3
-  console.log('  Videos usually take 2–8 minutes each; progress prints every minute.')
+  out.log(`▸ ${todo.length} shot(s) on ${p.video_model} ${p.resolution}${fresh.length < todo.length ? ` (${todo.length - fresh.length} resumed, already paid)` : ''} — about ${usd(cost)}`)
+  if (!gate(cost, opts, `Rendering ${fresh.length} shot(s)`, out)) return 3
+  out.log('  Videos usually take 2–8 minutes each; progress prints every minute.')
 
   let failed = 0
   let pending = 0
   await pool(todo, opts.concurrency, async (s) => {
     let r
-    const tick = (sec) => { if (sec % 60 < 15 && sec >= 60) console.log(`  … ${s.id} still rendering (${sec} s)`) }
+    const tick = (sec) => { if (sec % 60 < 15 && sec >= 60) out.log(`  … ${s.id} still rendering (${sec} s)`) }
     if (s.state === 'submitted' && s.task_id && !opts.redo.has(s.id)) {
-      console.log(`▸ ${s.id}: resuming task ${s.task_id}`)
+      out.log(`▸ ${s.id}: resuming task ${s.task_id}`)
       r = await waitTask('video', s.task_id, key, tick)
     } else {
       const prompt = buildShotPrompt(p, s)
@@ -771,34 +776,34 @@ async function cmdShots(proj, key, opts) {
       }
       Object.assign(s, { state: 'submitting', task_id: null, error: null, prompt_sent: prompt, hash: shotHash(p, s) })
       delete s.cost
-      console.log(`▸ ${s.id}: ${body.duration} s, ${refs.length} reference(s)`)
+      out.log(`▸ ${s.id}: ${body.duration} s, ${refs.length} reference(s)`)
       r = await runTask('video', body, key, async (id) => { s.task_id = id; s.state = 'submitted'; await proj.save() }, tick)
     }
     if (!r.ok) {
-      if (r.pending) { pending++; console.error(`… ${s.id}: ${r.message}\n  ${r.hint || ''}`); await proj.save(); return }
+      if (r.pending) { pending++; out.error(`… ${s.id}: ${r.message}\n  ${r.hint || ''}`); await proj.save(); return }
       failed++
       s.state = 'failed'
       s.error = r.message
       await proj.save()
-      console.error(`✗ ${s.id}: ${r.message}\n  ${explain(r.message, p)}`)
+      out.error(`✗ ${s.id}: ${r.message}\n  ${explain(r.message, p)}`)
       return
     }
     const file = join(proj.dir, 'shots', `${s.id}${extOf(r.urls[0], '.mp4')}`)
     try { await download(r.urls[0], file); s.file = file.slice(proj.dir.length + 1) } catch (e) {
-      console.error(`  (${s.id}: could not save locally: ${e.message} — run shots again to retry the download)`)
+      out.error(`  (${s.id}: could not save locally: ${e.message} — run shots again to retry the download)`)
     }
     s.url = r.urls[0]
     s.state = s.file ? 'done' : 'submitted'
     s.cost = await billed(r.taskId, key)
     await proj.save()
-    console.log(`✓ ${s.id}: ${s.file || s.url} in ${r.seconds} s  (${usd(s.cost)})`)
+    out.log(`✓ ${s.id}: ${s.file || s.url} in ${r.seconds} s  (${usd(s.cost)})`)
   })
-  console.log(`\nSpent so far on this project: ${usd(spent(p))}`)
+  out.log(`\nSpent so far on this project: ${usd(spent(p))}`)
   if (failed || pending) {
-    console.log(`${failed} failed, ${pending} still rendering. Finished shots are kept — run shots again${failed ? ' --retry-failed' : ''} to continue.`)
+    out.log(`${failed} failed, ${pending} still rendering. Finished shots are kept — run shots again${failed ? ' --retry-failed' : ''} to continue.`)
     return 1
   }
-  console.log('✓ all requested shots rendered — next: assemble')
+  out.log('✓ all requested shots rendered — next: assemble')
   return 0
 }
 
@@ -813,8 +818,7 @@ function run(cmd, args, opts = {}) {
 
 async function needBin(bin) {
   try { await run(bin, ['-version']) } catch {
-    console.error(`✗ ${bin} not found. Install ffmpeg (macOS: brew install ffmpeg · Ubuntu: sudo apt install ffmpeg · Windows: winget install ffmpeg).`)
-    process.exit(2)
+    throw stop(`${bin} not found. Install ffmpeg (macOS: brew install ffmpeg · Ubuntu: sudo apt install ffmpeg · Windows: winget install ffmpeg).`)
   }
 }
 
@@ -825,17 +829,18 @@ async function probe(file) {
   return { duration: Number(j.format?.duration) || 0, width: v?.width, height: v?.height, hasAudio: streams.some((x) => x.codec_type === 'audio') }
 }
 
-async function cmdAssemble(proj, opts) {
+export async function cmdAssemble(proj, opts) {
+  const out = opts.out ?? console
   const p = proj.data
   await needBin('ffmpeg')
   await needBin('ffprobe')
   const notReady = p.shots.filter((s) => s.state !== 'done' || !s.file || !existsSync(join(proj.dir, s.file)))
   if (notReady.length && !opts.allowMissing) {
-    console.error(`✗ not rendered yet: ${notReady.map((s) => s.id).join(', ')} — run shots, or pass --allow-missing to cut without them.`)
+    out.error(`✗ not rendered yet: ${notReady.map((s) => s.id).join(', ')} — run shots, or pass --allow-missing to cut without them.`)
     return 2
   }
   const shots = p.shots.filter((s) => !notReady.includes(s))
-  if (!shots.length) { console.error('✗ no rendered shots to assemble'); return 2 }
+  if (!shots.length) { out.error('✗ no rendered shots to assemble'); return 2 }
 
   const build = join(proj.dir, 'build')
   await mkdir(build, { recursive: true })
@@ -848,7 +853,7 @@ async function cmdAssemble(proj, opts) {
   for (const s of shots) {
     const src = join(proj.dir, s.file)
     const info = await probe(src)
-    const out = join(build, `${s.id}.mp4`)
+    const clip = join(build, `${s.id}.mp4`)
     const args = ['-y', '-v', 'error', '-i', src]
     const narration = p.mode === 'narration' && s.voice?.file ? join(proj.dir, s.voice.file) : null
     let audioIn = '0:a'
@@ -865,12 +870,12 @@ async function cmdAssemble(proj, opts) {
       ] : []),
     ].join(';')
     args.push('-filter_complex', fc, '-map', '[v]', '-map', '[a]', '-t', String(info.duration),
-      '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-c:a', 'aac', '-b:a', '160k', '-ar', '48000', out)
+      '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-c:a', 'aac', '-b:a', '160k', '-ar', '48000', clip)
     await run('ffmpeg', args)
-    const d = (await probe(out)).duration
+    const d = (await probe(clip)).duration
     timeline.push({ shot: s, start: t, duration: d })
     t += d
-    console.log(`  ✓ ${s.id} (${d.toFixed(1)} s)`)
+    out.log(`  ✓ ${s.id} (${d.toFixed(1)} s)`)
   }
 
   const slug = slugify(p.title)
@@ -901,15 +906,16 @@ async function cmdAssemble(proj, opts) {
 
   p.output = { file: basename(final), seconds: Math.round(t * 10) / 10, subtitles: srt ? basename(srtFile) : null, ...(burned ? { subtitled: basename(burned) } : {}) }
   await proj.save()
-  console.log(`\n✓ ${final}  (${t.toFixed(1)} s, ${shots.length} shots)`)
-  if (srt) console.log(`  subtitles → ${srtFile}${opts.burnSubs ? '' : '  (add --burn-subs to burn them in)'}`)
-  if (burned) console.log(`  subtitled → ${burned}`)
-  if (notReady.length) console.log(`  ! left out (not rendered): ${notReady.map((s) => s.id).join(', ')}`)
-  console.log(`  spent on this project: ${usd(spent(p))}`)
+  out.log(`\n✓ ${final}  (${t.toFixed(1)} s, ${shots.length} shots)`)
+  if (srt) out.log(`  subtitles → ${srtFile}${opts.burnSubs ? '' : '  (add --burn-subs to burn them in)'}`)
+  if (burned) out.log(`  subtitled → ${burned}`)
+  if (notReady.length) out.log(`  ! left out (not rendered): ${notReady.map((s) => s.id).join(', ')}`)
+  out.log(`  spent on this project: ${usd(spent(p))}`)
   return 0
 }
 
-async function cmdStatus(proj, key) {
+export async function cmdStatus(proj, key, opts = {}) {
+  const out = opts.out ?? console
   const p = proj.data
   // Fill in any cost that had not settled when the task finished. Lookups are free.
   if (key) {
@@ -920,39 +926,40 @@ async function cmdStatus(proj, key) {
     }
     await proj.save()
   }
-  console.log(`${p.title || '(untitled)'} — ${p.mode}, ${p.video_model} ${p.resolution} ${p.aspect}\n`)
+  out.log(`${p.title || '(untitled)'} — ${p.mode}, ${p.video_model} ${p.resolution} ${p.aspect}\n`)
   for (const { kind, item } of castEntries(p)) {
     const st = item.sheet_url ? 'ready' : item.sheet_task_id ? 'generating' : 'todo'
-    console.log(`  ${kind.padEnd(9)} ${item.id.padEnd(14)} ${st.padEnd(11)} ${item.sheet_cost != null ? usd(item.sheet_cost) : ''}`)
+    out.log(`  ${kind.padEnd(9)} ${item.id.padEnd(14)} ${st.padEnd(11)} ${item.sheet_cost != null ? usd(item.sheet_cost) : ''}`)
   }
-  console.log('')
+  out.log('')
   for (const s of p.shots) {
     const stale = s.state === 'done' && s.hash && s.hash !== shotHash(p, s) ? '  ⚠ inputs changed since render — shots --redo ' + s.id : ''
     const voice = p.mode === 'narration' && s.narration ? `  voice ${s.voice?.seconds ? s.voice.seconds + ' s' : 'todo'}` : ''
-    console.log(`  shot ${s.id.padEnd(10)} ${(s.state || 'todo').padEnd(11)} ${String(shotDuration(p, s)).padStart(2)} s  ${s.cost != null ? usd(s.cost) : '      '}${voice}${s.error ? `  — ${s.error}` : ''}${stale}`)
+    out.log(`  shot ${s.id.padEnd(10)} ${(s.state || 'todo').padEnd(11)} ${String(shotDuration(p, s)).padStart(2)} s  ${s.cost != null ? usd(s.cost) : '      '}${voice}${s.error ? `  — ${s.error}` : ''}${stale}`)
   }
-  console.log(`\n  spent ${usd(spent(p))}`)
+  out.log(`\n  spent ${usd(spent(p))}`)
   const est = estimate(p)
-  if (est.rows.length) { console.log('  still to pay:'); printEstimate(est) }
-  if (p.output?.file) console.log(`  output: ${p.output.file} (${p.output.seconds} s)`)
+  if (est.rows.length) { out.log('  still to pay:'); printEstimate(est, out) }
+  if (p.output?.file) out.log(`  output: ${p.output.file} (${p.output.seconds} s)`)
   return 0
 }
 
-function cmdEstimate(proj, opts) {
+export function cmdEstimate(proj, opts) {
+  const out = opts.out ?? console
   const p = proj.data
   const { errors, warnings } = validate(p)
-  for (const w of warnings) console.log(`  ! ${w}`)
-  for (const e of errors) console.error(`  ✗ ${e}`)
-  console.log(`\n${p.title || '(untitled)'} — ${p.shots.length} shot(s), ${p.shots.reduce((n, s) => n + shotDuration(p, s), 0)} s, ${p.mode} mode`)
-  console.log(`video ${p.video_model} ${p.resolution} ${p.aspect} · images ${p.image_model} ${p.image_resolution}${p.mode === 'narration' ? ` · narrator ${p.narrator.model} / ${p.narrator.voice_id}` : ''}\n`)
+  for (const w of warnings) out.log(`  ! ${w}`)
+  for (const e of errors) out.error(`  ✗ ${e}`)
+  out.log(`\n${p.title || '(untitled)'} — ${p.shots.length} shot(s), ${p.shots.reduce((n, s) => n + shotDuration(p, s), 0)} s, ${p.mode} mode`)
+  out.log(`video ${p.video_model} ${p.resolution} ${p.aspect} · images ${p.image_model} ${p.image_resolution}${p.mode === 'narration' ? ` · narrator ${p.narrator.model} / ${p.narrator.voice_id}` : ''}\n`)
   const est = estimate(p)
-  if (est.rows.length) printEstimate(est)
-  else console.log('  nothing left to pay for')
-  if (spent(p)) console.log(`  already spent ${usd(spent(p))}`)
+  if (est.rows.length) printEstimate(est, out)
+  else out.log('  nothing left to pay for')
+  if (spent(p)) out.log(`  already spent ${usd(spent(p))}`)
   if (opts.prompts) {
-    for (const s of p.shots) console.log(`\n── ${s.id} (${shotDuration(p, s)} s) refs: ${refItems(p, s).map((r) => r.item?.id).join(', ') || 'none'}\n${buildShotPrompt(p, s)}`)
+    for (const s of p.shots) out.log(`\n── ${s.id} (${shotDuration(p, s)} s) refs: ${refItems(p, s).map((r) => r.item?.id).join(', ') || 'none'}\n${buildShotPrompt(p, s)}`)
   }
-  if (errors.length) { console.error(`\n${errors.length} problem(s) — fix project.json before generating.`); return 2 }
+  if (errors.length) { out.error(`\n${errors.length} problem(s) — fix project.json before generating.`); return 2 }
   return 0
 }
 
@@ -1052,5 +1059,5 @@ const invokedDirectly = (() => {
   try { return import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href } catch { return false }
 })()
 if (invokedDirectly) {
-  main().then((code) => process.exit(code ?? 0), (e) => { console.error(`✗ ${e?.message ?? e}`); process.exit(1) })
+  main().then((code) => process.exit(code ?? 0), (e) => { console.error(`✗ ${e?.message ?? e}`); process.exit(e?.exitCode ?? 1) })
 }
