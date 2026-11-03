@@ -1,0 +1,63 @@
+{
+  "title": "The Last Delivery",
+  "language": "en",
+  "style": "2D anime, soft cel shading, muted palette with warm neon accents, cinematic lighting",
+  "aspect": "9:16",
+  "resolution": "480p",
+  "mode": "dialogue",
+  "characters": [
+    {
+      "id": "mika",
+      "name": "Mika",
+      "look": "a 20-year-old courier girl, short messy black bob, bright yellow rain jacket over a grey hoodie, black cargo pants, a battered delivery bag across her chest",
+      "voice": "young woman, quick and friendly"
+    },
+    {
+      "id": "hana",
+      "name": "Mrs. Hana",
+      "look": "an 80-year-old woman, silver hair in a low bun, round glasses, a cream knitted cardigan over a dark green dress",
+      "voice": "elderly woman, soft and slow"
+    }
+  ],
+  "locations": [
+    {
+      "id": "street",
+      "name": "Rainy street",
+      "look": "a narrow city street at night in heavy rain, glowing shop signs, wet asphalt reflecting neon"
+    },
+    {
+      "id": "door",
+      "name": "Apartment doorway",
+      "look": "the open wooden door of an old apartment, warm lamplight spilling into a dim corridor, a small shoe rack and a potted plant"
+    }
+  ],
+  "shots": [
+    {
+      "id": "s1",
+      "duration": 5,
+      "characters": ["mika"],
+      "location": "street",
+      "prompt": "Wide tracking shot. Mika rides a small electric scooter through the rain, brakes hard and checks the address on a soaked parcel.",
+      "dialogue": [{ "who": "mika", "line": "Last one tonight. Come on." }]
+    },
+    {
+      "id": "s2",
+      "duration": 6,
+      "characters": ["mika", "hana"],
+      "location": "door",
+      "prompt": "Medium two-shot, slow push-in. Mrs. Hana opens the door; Mika, dripping wet, holds the parcel out with both hands.",
+      "dialogue": [
+        { "who": "mika", "line": "Delivery for Hana Mori?" },
+        { "who": "hana", "line": "Nobody has sent me anything in years." }
+      ]
+    },
+    {
+      "id": "s3",
+      "duration": 6,
+      "characters": ["hana"],
+      "location": "door",
+      "prompt": "Close-up, static camera, shallow depth of field. Mrs. Hana unwraps an old envelope, reads the handwriting, and smiles as her eyes fill with tears.",
+      "dialogue": [{ "who": "hana", "line": "It's his handwriting." }]
+    }
+  ]
+}

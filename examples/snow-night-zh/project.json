@@ -1,0 +1,51 @@
+{
+  "title": "雪夜来客",
+  "language": "zh",
+  "style": "国漫风格，2D 动画，水墨质感，冷色调，电影感光影",
+  "aspect": "9:16",
+  "resolution": "480p",
+  "mode": "narration",
+  "narrator": { "model": "minimax-speech-2.8-turbo", "voice_id": "male-qn-qingse" },
+  "characters": [
+    {
+      "id": "linfeng",
+      "name": "林风",
+      "look": "二十岁的青年剑客，黑色长发高束马尾，白色交领长袍外披灰色斗篷，腰间佩一把旧剑"
+    },
+    {
+      "id": "laoren",
+      "name": "白发老人",
+      "look": "七十岁的老人，白发白须，身穿褪色的蓝布棉袍，手提一盏纸灯笼"
+    }
+  ],
+  "locations": [
+    {
+      "id": "inn",
+      "name": "山间客栈",
+      "look": "大雪中的山间小客栈，木门半掩，屋檐挂着红灯笼，门前积雪很深"
+    }
+  ],
+  "shots": [
+    {
+      "id": "s1",
+      "characters": ["linfeng"],
+      "location": "inn",
+      "prompt": "远景，镜头缓慢推进。林风顶着风雪走向客栈，斗篷被风吹起。",
+      "narration": "那一年的雪，下得比任何一年都大。林风走了三天，终于看见一点灯火。"
+    },
+    {
+      "id": "s2",
+      "characters": ["linfeng", "laoren"],
+      "location": "inn",
+      "prompt": "中景。客栈门被推开，白发老人提着灯笼站在门内，看着门外的林风。两人对视，雪花在灯光里飘落。",
+      "narration": "开门的老人看了他很久，只说了一句：你终于来了。"
+    },
+    {
+      "id": "s3",
+      "characters": ["linfeng"],
+      "location": "inn",
+      "prompt": "特写，背景虚化。林风握紧腰间旧剑的剑柄，眼神从疑惑变得坚定。",
+      "narration": "他不认识这个老人。可老人手里的灯笼，和他梦里见过的一模一样。"
+    }
+  ]
+}

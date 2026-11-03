@@ -1,0 +1,10 @@
+node_modules/
+.DS_Store
+# Anything an example produces when you run it in place
+examples/*/cast/
+examples/*/audio/
+examples/*/shots/
+examples/*/build/
+examples/*/*.mp4
+examples/*/*.srt
+*.tmp-*
