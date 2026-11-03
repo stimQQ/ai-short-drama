@@ -95,10 +95,62 @@ npx skills add stimQQ/ai-short-drama
 git clone https://github.com/stimQQ/ai-short-drama ~/.claude/skills/ai-short-drama
 ```
 
-**API key:** the first time, your agent runs `drama.mjs login`. That opens
-apimodels.app, you click **Authorize**, and a key is saved to
-`~/.apimodels/credentials`; it never enters the chat. You can also set
-`APIMODELS_API_KEY`. Keys: https://apimodels.app/console/api-keys
+## Your API key
+
+You use **your own apimodels.app key**, and every generation is billed to your
+own balance. This repository contains no key.
+
+**First run:**
+
+1. Sign up at [apimodels.app](https://apimodels.app) and add credit at
+   https://apimodels.app/console/credits.
+2. Install the skill (above).
+3. Ask your agent for an episode. It finds no key on your computer, runs
+   `drama.mjs login` and shows you a link:
+
+   ```
+   Open this link, log in if asked, and click “Authorize”:
+
+     https://apimodels.app/cli-auth?port=…&state=…
+   ```
+
+4. Click **Authorize**. apimodels.app creates a key named "CLI · <date>" for
+   your account and saves it on your computer in `~/.apimodels/credentials`,
+   readable only by you. You copy and paste nothing, and the key never appears
+   in the chat.
+5. The agent carries on with the estimate, the character sheets and the shots.
+
+**After that:**
+
+- The script reads the key from your computer and sends it with each request
+  to `api.apimodels.app`.
+- Each finished task is charged to your balance at list price. Failed tasks
+  are not charged.
+- `status` shows exactly what the episode cost, read back from your billing
+  records.
+- If your balance runs out, the API answers `402`. Top up and run the same
+  command again; finished shots are kept.
+
+**Other ways to provide the key:**
+
+- **You already have a key:** set `APIMODELS_API_KEY`. Keys are at
+  https://apimodels.app/console/api-keys.
+- **No browser on this machine** (a remote server, for example): open a
+  new terminal window and run the command below. The key is not shown while
+  you type and stays out of your shell history.
+  `read -s KEY && printf %s "$KEY" | node /path/to/ai-short-drama/scripts/drama.mjs save-key && unset KEY`
+- **You logged in with the [apimodels MCP server](https://www.npmjs.com/package/apimodels-mcp)**
+  (`npx apimodels-mcp login`): there is nothing to do. The skill reads that
+  login from `~/.apimodels/credentials.json`.
+
+The key is looked up in this order: `APIMODELS_API_KEY`, then
+`~/.apimodels/credentials`, then `~/.apimodels/credentials.json`. The skill
+has no `--key` flag, on purpose: command arguments end up in chat transcripts
+and process lists.
+
+**Managing it:** the "CLI · <date>" key is listed at
+https://apimodels.app/console/api-keys, and you can revoke it at any time. The
+next run then asks you to authorize again.
 
 ## What it costs
 
@@ -183,7 +235,34 @@ MIT licensed.
 npx skills add stimQQ/ai-short-drama
 ```
 
-第一次使用时，Agent 会运行 `drama.mjs login` 打开 apimodels.app。你点一下 **Authorize**，Key 会存到本机 `~/.apimodels/credentials`，不会出现在对话里。
+**API Key 怎么用：** 你用的是**自己在 apimodels.app 的 Key**，所有生成费用都从你自己的账户余额里扣。本仓库里不含任何 Key。
+
+第一次使用：
+1. 在 [apimodels.app](https://apimodels.app) 注册，并在 https://apimodels.app/console/credits 充值。
+2. 安装本 skill（见上）。
+3. 对 Agent 说「帮我做一集短剧」。Agent 发现你电脑上还没有 Key，会自动运行 `drama.mjs login`，在对话里给你一个链接：
+   ```
+   Open this link, log in if asked, and click “Authorize”:
+
+     https://apimodels.app/cli-auth?port=…&state=…
+   ```
+4. 在浏览器里点 **Authorize**。apimodels.app 会给你的账户新建一个名为「CLI · 日期」的 Key，并直接存到你电脑上的 `~/.apimodels/credentials`（只有你本人可读）。你不需要复制粘贴，Key 也不会出现在对话里。
+5. Agent 接着干活：估价、生成设定图、渲染镜头。
+
+之后每次生成：
+- 脚本从你电脑上读取 Key，随请求发给 `api.apimodels.app`。
+- 每完成一个任务，按标价从你的余额扣费；失败的任务不扣费。
+- `status` 显示这一集的实际扣费，数据从扣费记录回读。
+- 余额不足时接口返回 `402`。充值后重跑同一条命令即可，已完成的镜头会保留。
+
+其他提供 Key 的方式：
+- **已经有 Key**：设置环境变量 `APIMODELS_API_KEY`。Key 在 https://apimodels.app/console/api-keys 管理。
+- **机器上没有浏览器**（比如远程服务器）：新开一个终端窗口运行下面这条命令。输入的 Key 不显示，也不进命令历史：`read -s KEY && printf %s "$KEY" | node /path/to/ai-short-drama/scripts/drama.mjs save-key && unset KEY`
+- **用 apimodels MCP 登录过**（`npx apimodels-mcp login`）：什么都不用做，skill 会读取那次登录（`~/.apimodels/credentials.json`）。
+
+Key 的查找顺序：`APIMODELS_API_KEY` → `~/.apimodels/credentials` → `~/.apimodels/credentials.json`。skill 故意不提供 `--key` 参数，因为命令参数会留在对话记录和进程列表里。
+
+管理 Key：「CLI · 日期」这个 Key 会出现在 https://apimodels.app/console/api-keys，随时可以吊销；吊销后下次使用会重新走授权。
 
 **费用：** 按次计费，按标价。一集 1 分钟（12 个 5 秒镜头、5 张设定图）大约：
 - 动漫 / 国漫风格，`dreamina-seedance-2-0-mini`：480p $1.46，720p $2.99
